@@ -1,133 +1,105 @@
 #include <iostream>
+#include "listas_rec.hpp" //_rec x recortada, es la de fragmentos sin insertar_unico
 
 using namespace std;
 
-void mostrar(int vec[], int dim)
+struct Deuda {
+	string cliente;
+	int mes;
+	int cant;
+};
+
+//por cliente y ante igualdad por mes, ambos ascendente
+int critdeu(Deuda a, Deuda b)
+{
+	if (a.cliente == b.cliente)
+		return a.mes - b.mes;
+	else
+		return a.cliente > b.cliente ? 1 : -1;
+}
+
+ostream& operator << (ostream &os, const Deuda& deuda)
+{
+	os << deuda.cliente << " - mes: " << deuda.mes
+	   << " - cant: " << deuda.cant;
+	return os;
+}
+
+template <typename T> void mostrar(T vec[], int dim)
 {
 	for (int i = 0; i < dim; i++)
-		cout << i << ": " << vec[i] << endl;
+		cout << vec[i] << endl;
 }
-//Algoritmo de inserción
-void ordenar_asc(int v[], int dim)
-{
-	int i, j, temp;
 
-	for (i = 1; i < dim ; i++) {
-		temp = v[i];
-		j = i - 1;
-		while (j >= 0 && v[j] > temp) {
-			v[j + 1] = v[j];
-			j--;
+template <typename T> Nodo<T>* insertar_unico(T valor, Nodo<T>*& lista, int (*criterio)(T, T))
+{
+	if (lista == nullptr || criterio(valor, lista->dato) < 0) {
+		Nodo<T>* nuevo = new Nodo<T>; //Genero nodo
+		nuevo->dato = valor; // y guardo el valor
+		nuevo->sig = lista;
+		lista = nuevo;
+		return nuevo;
+	} else {
+		if (criterio(valor, lista->dato) == 0) //Si justo es igual al primero
+			return lista;
+		Nodo<T>* p = lista;
+		while (p->sig != nullptr && criterio(valor, p->sig->dato) > 0)
+			p = p->sig;
+		if (p->sig != nullptr && criterio(valor, p->sig->dato) == 0) {
+			return p->sig; //devuelvo el que ya estaba en la lista
+		} else {
+			Nodo<T>* nuevo = new Nodo<T>; //Genero nodo
+			nuevo->dato = valor; // y guardo el valor
+			nuevo->sig = p->sig;
+			p->sig = nuevo;
+			return nuevo;
 		}
-		v[j + 1] = temp;
 	}
 }
-
-//Algoritmo de inserción pero cambio la comparación para que sea descendente
-void ordenar_desc(int v[], int dim)
-{
-	int i, j, temp;
-
-	for (i = 1; i < dim ; i++) {
-		temp = v[i];
-		j = i-1;
-		while (j >= 0 && v[j] < temp) {
-			v[j + 1] = v[j];
-			j--;
-		}
-		v[j + 1] = temp;
-	}
-}
-
-//Algoritmo de inserción parametrizando la función criterio de comparación
-void ordenar(int vec[], int dim, int (*criterio)(int, int))
-{
-	int i, j;
-	int temp;
-
-	for (i = 1; i < dim ; i++) {
-		temp = vec[i];
-		j = i - 1;
-
-		//&& vec[j] > temp
-		while (j >= 0 && criterio(vec[j], temp) > 0) {
-			vec[j + 1] = vec[j];
-			j--;
-		}
-		vec[j + 1] = temp;
-	}
-}
-/*******************************************************************************
-* La función criterio debe comparar los elementos que se le pasan como
-* parámetros. Supongamos que al primer parámetro lo llamo a y al segundo b, y
-* llamo r al valor retornado, entonces cumplir:
-*         Si a > b  entonces r > 0
-*         Si a < b  entonces r < 0
-*         Si a == b entonces r == 0
-*******************************************************************************/
-//Criterios
-int criterio_int_asc(int a, int b)
-{
-	if (a > b)
-		return 1;
-	else if (a < b)
-		return -1;
-	else
-		return 0;
-	//return a - b; OJO solo funciona con enteros, no con flotantes
-}
-
-int criterio_int_des(int a, int b)
-{
-	if (a > b)
-		return -1;
-	else
-		return a < b ? 1 : 0;
-	//return b - a; OJO solo funciona con enteros, no con flotantes
-}
-
-/*******************************************************************************
-* Alterantivas
-* Si y solo si son enteros
-* return a - b;//ascendente
-* return b - a;//descendente
-* Para cualquier tipo numérico
-* return (a > b) - (a < b);//ascendente
-* return (a < b) - (a > b);//descendente
-* Para cualquier tipo que pueda usar los comparadores < y >
-* return (a < b) ? -1 : (a > b);//ascendente
-* return (a > b) ? -1 : (a < b);//descendente
-*******************************************************************************/
 
 int main()
 {
-	const int dim {8};
-	int vec_ent[dim] = {2, 5, 3, 7, 4, 1, 6, 7};
+	const int dim = 17;
+	Deuda vdeu[dim] = {
+		{"Pedro", 12, 164}, {"Pedro", 6, 37}, {"Maria", 7, 474},
+		{"Pedro", 12, 255}, {"Pedro", 12, 155}, {"Juan", 3, 377},
+		{"Maria", 9, 260}, {"Ana", 2, 52}, {"Maria", 7, 95},
+		{"Maria", 5, 243}, {"Juan", 3, 218}, {"Juan", 5, 75},
+		{"Juan", 3, 284}, {"Pedro", 6, 69}, {"Juan", 6, 184},
+		{"Ana", 6, 446}, {"Ana", 2, 272}
+	};
+	Nodo<Deuda> *listaord = nullptr; //lista ordenada con repeticiones
+	Nodo<Deuda> *listauni = nullptr; //lista ordenada sin repetir claves
+	Nodo<Deuda> *listacons = nullptr;//lista ordenada y consolidada
+	//es decir, acumulando deudas del mismo mes
+	int i;
+	cout << "=========== Vector Original ===========" << endl;
+	mostrar(vdeu, dim);
 
-	// ============ Sin usar Criterios
-	cout << "Vector enteros original:" << endl;
-	mostrar(vec_ent, dim);
-	cout << endl;
+	//Armamos una lista ordenada con repeticiones
+	for (i = 0; i < dim; ++i)
+		insertar(vdeu[i], listaord, critdeu); //insertar tradicional
+	cout << endl << "=========== Ordenada con repeticiones ===========" << endl;
+	mostrar(listaord);
 
-	cout << "Vector enteros Ascendente:" << endl;
-	ordenar_asc(vec_ent, dim);
-	mostrar(vec_ent, dim);
+	//Armamos una lista ordenada con elementos únicos
+	for (i = 0; i < dim; ++i)
+		insertar_unico(vdeu[i], listauni, critdeu); //insertar único
+	cout << endl << "=========== Ordenada SIN repeticiones ===========" << endl;
+	mostrar(listauni);
 
-	cout << "Vector enteros Descendente:" << endl;
-	ordenar_desc(vec_ent, dim);
-	mostrar(vec_ent, dim);
-	cout << endl << "===Presione enter para continuar:";
+	//Armamos una lista consolidada similar a ejercicio guia anterior
+	Deuda d0;
+	d0.cant = 0;
+	Nodo<Deuda> *pnodo;
+	for (i = 0; i < dim; ++i) {
+		d0.cliente = vdeu[i].cliente;
+		d0.mes = vdeu[i].mes;
+		pnodo = insertar_unico(d0, listacons, critdeu);
+		pnodo->dato.cant += vdeu[i].cant;
+	}
+	cout << endl << "=========== Lista consolidada ===========" << endl;
+	mostrar(listacons);
 
-	// ============ Usando Criterios
-	cin.get();
-	cout << "Vector enteros Ascendente:" << endl;
-	ordenar(vec_ent, dim, criterio_int_asc);
-	mostrar(vec_ent, dim);
-	cout << endl;
-
-	cout << "Vector enteros Descendente:" << endl;
-	ordenar(vec_ent, dim, criterio_int_des);
-	mostrar(vec_ent, dim);
-	cout << endl << "===Presione enter para continuar:";
 	return 0;
 }
